@@ -1,0 +1,24 @@
+{
+    "compilerOptions": {
+        "target": "es6",
+        "sourceMap": true,
+        "module": "commonjs",
+        "importHelpers": true,
+        "allowJs": false,
+        "outDir": "lib",
+        "lib": [
+            "es6"
+        ],
+        "moduleResolution": "node",
+        "types": [
+            "node",
+            "jest"
+        ],
+        "declaration": true,
+        "removeComments": true
+    },
+    "exclude": ["node_modules", "lib"],
+    "include": [
+        "src/**/*"
+    ]
+}
