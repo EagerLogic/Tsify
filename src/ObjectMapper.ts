@@ -1,34 +1,45 @@
 import * as DS from '@google-cloud/datastore';
 import { NativeEntity } from './NativeEntity';
-import { AEntity } from './AEntity';
 import { entity } from '@google-cloud/datastore/build/src/entity';
-import { TId, Key } from './Key';
+import { Key, getEntityKind } from './Key';
 import { Tsify } from './Tsify';
+import { IEntity, TId, Long } from './IEntity';
 
 const ds = new DS.Datastore();
 
 export class ObjectMapper {
 
-    public static entity2native<$T extends AEntity<TId>>(e: $T): NativeEntity {
+    public static entity2native<$Entity extends IEntity<TId>>(e: $Entity): NativeEntity {
         if (e == null) {
             throw new Error('The entity parameter can not be null');
         }
 
+        var kind: string = getEntityKind(e).name;
+        var factory = Tsify.getEntityFactoryByClassName(kind);
+        if (factory == null) {
+            throw new Error("Can't find registered IEntityFactory for kind: " + kind);
+        }
+
         var res: NativeEntity = new NativeEntity();
 
-        var keyOptions: entity.KeyOptions = {path: this.key2path(e.key)};
-        if (e.namespace != null) {
-            keyOptions.namespace = e.namespace;
+        var key = Key.fromEntity(e);
+        var keyOptions: entity.KeyOptions = {path: this.key2path(key)};
+        
+        if (e._namespace != null) {
+            keyOptions.namespace = e._namespace;
         }
-        res.key = new entity.Key(keyOptions);
-        res.data = this.entity2data(e);
-        res.excludeFromIndexes = e.excludeFromIndexes;
 
-        return res as NativeEntity;
+
+        res.key = ds.key(keyOptions);
+        res.data = this.entity2data(e);
+        if (e._excludeFromIndexes != null) {
+            res.excludeFromIndexes = e._excludeFromIndexes;
+        }
+
+        return res;
     }
 
-    public static native2entity<$T extends AEntity<TId>>(data: any): $T {
-        
+    public static native2entity<$Entity extends IEntity<TId>>(data: any): $Entity {
         var nk: entity.Key = data[ds.KEY];
         var factory = Tsify.getEntityFactoryByClassName(nk.kind);
         if (factory == null) {
@@ -36,10 +47,26 @@ export class ObjectMapper {
         }
 
         var res = factory.createEntity();
-        var resa: any = res;
 
-        var key: Key<TId> = this.native2key(nk);
-        resa._key = key;
+        var key: Key<$Entity> = this.native2key(nk) as Key<$Entity>;
+        if (key.id != null) {
+            res.id = key.id;
+        } else {
+            res.id = null;
+        }
+        if (key.namespace != null) {
+            res._namespace = key.namespace;
+        } else {
+            delete res._namespace;
+        }
+        if (key.parent != null) {
+            res._parent = key.parent;
+        } else {
+            delete res._parent;
+        }
+        
+        var resa: any = res;
+        
 
         for (var p in data) {
             if ((typeof p) != 'string') {
@@ -56,23 +83,37 @@ export class ObjectMapper {
             resa[p] = data[p];
         }
 
-        return res as $T;
+        return res as $Entity;
     }
 
-    private static key2path(key: Key<TId>): any[] {
+    private static key2path(key: Key<IEntity<TId>>): any[] {
         var res: any[] = [];
+
+        var ns = key.namespace;
 
         var k = key;
         while (k != null) {
+            if (k.namespace != ns) {
+                throw new Error('The parent entity must be in the same namespace as the entity itself!');
+            }
             res.push(k.kind);
-            res.push(k.id);
+            if (k.id != null) {
+                if (k.id instanceof Long) {
+                    res.push(new entity.Int(k.id.value));
+                } else if ((typeof k.id) == 'string') {
+                    res.push(k.id);
+                } else {
+                    throw new Error('Invalid id type: ' + k.id);
+                }
+            }
+
             k = key.parent;
         }
 
         return res;
     }
 
-    private static entity2data(e: AEntity<TId>): {} {
+    private static entity2data(e: IEntity<TId>): {} {
         var res = {};
 
         var exclude = ['_id', '_namespace', '_parent', '_excludeFromIndexes'];
@@ -115,33 +156,33 @@ export class ObjectMapper {
         return res;
     }
 
-    public static native2key(nk: entity.Key): Key<TId> {
+    public static native2key(nk: entity.Key): Key<IEntity<TId>> {
         if (nk == null) {
             return null;
         }
 
-        var parent: Key<TId> = null;
+        var parent: Key<IEntity<TId>> = null;
         if (nk.parent != null) {
             parent = this.native2key(nk.parent);
         }
 
         var id: TId;
         if (nk.id != null) {
-            id = ds.int(nk.id);
+            id = new Long(nk.id);
         } else {
-            id = nk.id;
+            id = nk.name;
         }
 
-        return Key.createWithParent(nk.kind, id, parent, nk.namespace);
+        return Key.createRaw(nk.kind, id, parent, nk.namespace);
         
     }
 
-    public static key2native<$IdType extends TId>(key: Key<$IdType>): entity.Key {
+    public static key2native<$Entity extends IEntity<TId>>(key: Key<$Entity>): entity.Key {
         var keyOptions: entity.KeyOptions = {path: this.key2path(key)};
         if (key.namespace != null) {
             keyOptions.namespace = key.namespace;
         }
-        var res = new entity.Key(keyOptions);
+        var res = ds.key(keyOptions);
 
         return res;
     }

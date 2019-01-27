@@ -1,13 +1,12 @@
-import { AEntity } from './AEntity';
-import { TId, Key } from './Key';
+import { Key } from './Key';
 import { IEntityFactory } from './IEntityFactory';
 import * as DS from '@google-cloud/datastore';
 import { ObjectMapper } from './ObjectMapper';
-import { resolve } from 'url';
 import { NativeEntity } from './NativeEntity';
 import { entity, Entity } from '@google-cloud/datastore/build/src/entity';
 import { Query } from '@google-cloud/datastore/build/src/query';
 import { Transaction } from '@google-cloud/datastore/build/src/transaction';
+import { IEntity, TId, Long } from './IEntity';
 
 const ds = new DS.Datastore();
 
@@ -19,9 +18,9 @@ export interface IJob<$Result> {
 
 export class Tsify {
 
-    private static readonly entityFactories: { [name: string]: IEntityFactory<AEntity<TId>> } = {};
+    private static readonly entityFactories: { [name: string]: IEntityFactory<IEntity<TId>> } = {};
 
-    public static registerEntity<$T extends AEntity<TId>>(cls: Class<$T>, factory: IEntityFactory<$T>): void {
+    public static registerEntity<$T extends IEntity<TId>>(cls: Class<$T>, factory: IEntityFactory<$T>): void {
         if (cls == null) {
             throw new Error('The cls parameter can not be null!');
         }
@@ -34,18 +33,18 @@ export class Tsify {
         this.entityFactories[cls.name] = factory;
     }
 
-    public static getEntityFactoryByClass<$T extends AEntity<TId>>(cls: Class<$T>): IEntityFactory<$T> {
+    public static getEntityFactoryByClass<$T extends IEntity<TId>>(cls: Class<$T>): IEntityFactory<$T> {
         return this.getEntityFactoryByClassName(cls.name);
     }
 
-    public static getEntityFactoryByClassName<$T extends AEntity<TId>>(clsName: string): IEntityFactory<$T> {
+    public static getEntityFactoryByClassName<$T extends IEntity<TId>>(clsName: string): IEntityFactory<$T> {
         return this.entityFactories[clsName] as IEntityFactory<$T>;
     }
 
-    public static async save<$IdType extends TId>(entity: AEntity<$IdType>): Promise<Key<$IdType>> {
+    public static async save<$Entity extends IEntity<TId>>(entity: $Entity): Promise<Key<$Entity>> {
         var nEntity = ObjectMapper.entity2native(entity);
 
-        var res = new Promise<Key<$IdType>>((resolve, reject) => {
+        var res = new Promise<Key<$Entity>>((resolve, reject) => {
             ds.save(nEntity, (err) => {
                 if (err != null) {
                     reject(err);
@@ -53,9 +52,9 @@ export class Tsify {
                 }
 
                 if (nEntity.key.id != null) {
-                    entity.id = nEntity.key.id as $IdType;
+                    entity.id = new Long(nEntity.key.id);
                 } else {
-                    entity.id = nEntity.key.name as $IdType;
+                    entity.id = nEntity.key.name;
                 }
 
                 resolve(Key.fromEntity(entity));
@@ -65,27 +64,27 @@ export class Tsify {
         return res;
     }
 
-    public static async saveEntities<$IdType extends TId>(entities: AEntity<$IdType>[]): Promise<Key<$IdType>[]> {
+    public static async saveEntities(entities: IEntity<TId>[]): Promise<Key<IEntity<TId>>[]> {
         var nEntities: NativeEntity[] = [];
         for (var e of entities) {
             nEntities.push(ObjectMapper.entity2native(e));
         }
 
-        var res = new Promise<Key<$IdType>[]>((resolve, reject) => {
+        var res = new Promise<Key<IEntity<TId>>[]>((resolve, reject) => {
             ds.save(nEntities, (err) => {
                 if (err != null) {
                     reject(err);
                     return;
                 }
 
-                var res: Key<$IdType>[] = []
+                var res: Key<IEntity<TId>>[] = []
                 for (var i = 0; i < nEntities.length; i++) {
                     var nEntity = nEntities[i];
 
                     if (nEntity.key.id != null) {
-                        entities[i].id = nEntity.key.id as $IdType;
+                        entities[i].id = new Long(nEntity.key.id);
                     } else {
-                        entities[i].id = nEntity.key.name as $IdType;
+                        entities[i].id = nEntity.key.name;
                     }
 
                     res.push(Key.fromEntity(entities[i]));
@@ -98,11 +97,18 @@ export class Tsify {
         return res;
     }
 
-    public static async findByKey<$IdType extends TId, $Entity extends AEntity<$IdType>>(key: Key<$IdType>): Promise<$Entity> {
+    public static async findByKey<$Entity extends IEntity<TId>>(key: Key<$Entity>): Promise<$Entity> {
         return new Promise<$Entity>(async (resolve, reject) => {
             try {
+                var k = ObjectMapper.key2native(key);
                 var nres = await ds.get(ObjectMapper.key2native(key));
+                if (nres == null) {
+                    resolve(null);
+                }
                 if (nres.length < 1) {
+                    resolve(null);
+                }
+                if (nres[0] == null) {
                     resolve(null);
                 }
                 resolve(ObjectMapper.native2entity(nres[0]) as $Entity);
@@ -113,7 +119,7 @@ export class Tsify {
         });
     }
 
-    public static async deleteByKey(key: Key<TId>): Promise<void> {
+    public static async deleteByKey(key: Key<IEntity<TId>>): Promise<void> {
         return new Promise<void>((resolve, reject) => {
             ds.delete(ObjectMapper.key2native(key), (err) => {
                 if (err != null) {
@@ -124,7 +130,7 @@ export class Tsify {
         });
     }
 
-    public static async deleteByKeys(keys: Key<TId>[]): Promise<void> {
+    public static async deleteByKeys(keys: Key<IEntity<TId>>[]): Promise<void> {
         return new Promise<void>((resolve, reject) => {
             var nkeys: entity.Key[] = [];
             for (var k of keys) {
@@ -139,21 +145,21 @@ export class Tsify {
         });
     }
 
-    public static find<$IdType extends TId, $Entity extends AEntity<$IdType>>(cls: Class<$Entity>, namespace: string): Finder<$IdType, $Entity> {
-        return new Finder<$IdType, $Entity>(cls, namespace);
+    public static find<$Entity extends IEntity<TId>>(cls: Class<$Entity>, namespace?: string): Finder<$Entity> {
+        return new Finder<$Entity>(cls, namespace);
     }
 
 }
 
 export type FilterOperator = "=" | "<" | "<=" | ">" | ">=";
 
-export class Finder<$IdType extends TId, $Entity extends AEntity<$IdType>> {
+export class Finder<$Entity extends IEntity<TId>> {
 
     private cls: Class<$Entity>;
     private namespace: string;
     private filters: { property: string, operator: FilterOperator, value: any }[] = [];
     private orders: { property: string, descending: boolean }[] = [];
-    private anchestorKey: Key<TId> = null;
+    private anchestorKey: Key<IEntity<TId>> = null;
     private limitCount: number = null;
     private offsetCount: number = null;
 
@@ -162,22 +168,22 @@ export class Finder<$IdType extends TId, $Entity extends AEntity<$IdType>> {
         this.namespace = namespace;
     }
 
-    public anchestor(anchestorKey: Key<TId>): Finder<$IdType, $Entity> {
+    public anchestor(anchestorKey: Key<IEntity<TId>>): Finder<$Entity> {
         this.anchestorKey = anchestorKey;
         return this;
     }
 
-    public filter(property: string, operator: FilterOperator, value: any): Finder<$IdType, $Entity> {
+    public filter(property: string, operator: FilterOperator, value: any): Finder<$Entity> {
         this.filters.push({ property: property, operator: operator, value: value });
         return this;
     }
 
-    public orderBy(property: string, descending?: boolean): Finder<$IdType, $Entity> {
+    public orderBy(property: string, descending?: boolean): Finder<$Entity> {
         this.orders.push({ property: property, descending: descending });
         return this;
     }
 
-    public limit(count: number): Finder<$IdType, $Entity> {
+    public limit(count: number): Finder<$Entity> {
         if (count == null) {
             this.limitCount = null;
         }
@@ -191,7 +197,7 @@ export class Finder<$IdType extends TId, $Entity extends AEntity<$IdType>> {
         return this;
     }
 
-    public offset(count: number): Finder<$IdType, $Entity> {
+    public offset(count: number): Finder<$Entity> {
         if (count == null) {
             this.offsetCount = null;
         }
@@ -222,16 +228,17 @@ export class Finder<$IdType extends TId, $Entity extends AEntity<$IdType>> {
         });
     }
 
-    public async runKeysOnly(): Promise<Key<$IdType>[]> {
-        return new Promise<Key<$IdType>[]>(async (resolve, reject) => {
+    public async runKeysOnly(): Promise<Key<$Entity>[]> {
+        return new Promise<Key<$Entity>[]>(async (resolve, reject) => {
             var q = this.buildQuery();
             q = q.select("__key__");
 
             try {
                 var [nres] = await ds.runQuery(q);
-                var res: Key<$IdType>[] = [];
-                for (var nr of nres) {
-                    res.push(ObjectMapper.native2key(nr) as Key<$IdType>);
+                var nkeys: entity.Key[] = nres.map((v) => v[ds.KEY]);
+                var res: Key<$Entity>[] = [];
+                for (var nr of nkeys) {
+                    res.push(ObjectMapper.native2key(nr) as Key<$Entity>);
                 }
                 resolve(res);
             } catch (e) {
@@ -252,7 +259,7 @@ export class Finder<$IdType extends TId, $Entity extends AEntity<$IdType>> {
             if (this.cls != null) {
                 q = ds.createQuery(this.cls.name);
             } else {
-                q = ds.createQuery(undefined);
+                q = ds.createQuery(null, null);
             }
         }
 

@@ -1,0 +1,1 @@
+gcloud beta emulators datastore start --host-port=localhost:8081 --no-legacy --consistency=1.0 --no-store-on-disk

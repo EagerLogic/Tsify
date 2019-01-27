@@ -1,8 +1,7 @@
-import { AEntity } from './AEntity';
-import { TId } from './Key';
+import { IEntity, TId } from './IEntity';
 
 
-export interface IEntityFactory<$Entity extends AEntity<TId>> {
+export interface IEntityFactory<$Entity extends IEntity<TId>> {
 
     createEntity(): $Entity;
 

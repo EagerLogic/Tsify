@@ -1,4 +1,4 @@
-export { AEntity } from './AEntity';
+export { IEntity } from './IEntity';
 export { IEntityFactory } from './IEntityFactory';
-export { TId, Key } from './Key';
+export { Key } from './Key';
 export { Class, IJob, Tsify, FilterOperator, Finder } from './Tsify';
