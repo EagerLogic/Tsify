@@ -1,7 +1,7 @@
 import { Key } from './Key';
 import { entity } from '@google-cloud/datastore/build/src/entity';
 
-export class Long {
+export class LongId {
 
     private _value: string;
 
@@ -18,7 +18,7 @@ export class Long {
 
 }
 
-export type TId = string | Long;
+export type TId = string | LongId;
 
 export interface IEntity<$Id extends TId> {
 

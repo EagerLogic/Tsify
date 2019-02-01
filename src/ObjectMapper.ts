@@ -3,7 +3,7 @@ import { NativeEntity } from './NativeEntity';
 import { entity } from '@google-cloud/datastore/build/src/entity';
 import { Key, getEntityKind } from './Key';
 import { Tsify } from './Tsify';
-import { IEntity, TId, Long } from './IEntity';
+import { IEntity, TId, LongId } from './IEntity';
 
 const ds = new DS.Datastore();
 
@@ -80,7 +80,11 @@ export class ObjectMapper {
             if (vt == 'function') {
                 continue;
             }
-            resa[p] = data[p];
+            if (ds.isInt(v)) {
+                resa[p] = new LongId((v as entity.Int).value);
+            } else {
+                resa[p] = data[p];
+            }
         }
 
         return res as $Entity;
@@ -98,7 +102,7 @@ export class ObjectMapper {
             }
             res.push(k.kind);
             if (k.id != null) {
-                if (k.id instanceof Long) {
+                if (k.id instanceof LongId) {
                     res.push(new entity.Int(k.id.value));
                 } else if ((typeof k.id) == 'string') {
                     res.push(k.id);
@@ -116,7 +120,7 @@ export class ObjectMapper {
     private static entity2data(e: IEntity<TId>): {} {
         var res = {};
 
-        var exclude = ['_id', '_namespace', '_parent', '_excludeFromIndexes'];
+        var exclude = ['id', '_namespace', '_parent', '_excludeFromIndexes'];
 
         for (var p in e) {
             if ((typeof p) != 'string') {
@@ -145,8 +149,8 @@ export class ObjectMapper {
                 } else {
                     res[p] = ds.double(v);
                 }
-            } else if (v instanceof Key) {
-                res[p] = this.key2path(v);
+            } else if (v instanceof LongId) {
+                res[p] = ds.int(v.value);
             } else {
                 res[p] = v;
             }
@@ -168,7 +172,7 @@ export class ObjectMapper {
 
         var id: TId;
         if (nk.id != null) {
-            id = new Long(nk.id);
+            id = new LongId(nk.id);
         } else {
             id = nk.name;
         }

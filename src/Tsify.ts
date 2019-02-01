@@ -6,7 +6,7 @@ import { NativeEntity } from './NativeEntity';
 import { entity, Entity } from '@google-cloud/datastore/build/src/entity';
 import { Query } from '@google-cloud/datastore/build/src/query';
 import { Transaction } from '@google-cloud/datastore/build/src/transaction';
-import { IEntity, TId, Long } from './IEntity';
+import { IEntity, TId, LongId } from './IEntity';
 
 const ds = new DS.Datastore();
 
@@ -52,7 +52,7 @@ export class Tsify {
                 }
 
                 if (nEntity.key.id != null) {
-                    entity.id = new Long(nEntity.key.id);
+                    entity.id = new LongId(nEntity.key.id);
                 } else {
                     entity.id = nEntity.key.name;
                 }
@@ -82,7 +82,7 @@ export class Tsify {
                     var nEntity = nEntities[i];
 
                     if (nEntity.key.id != null) {
-                        entities[i].id = new Long(nEntity.key.id);
+                        entities[i].id = new LongId(nEntity.key.id);
                     } else {
                         entities[i].id = nEntity.key.name;
                     }

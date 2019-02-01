@@ -1,5 +1,5 @@
 import { Tsify } from '../src/Tsify';
-import {IEntity, Long} from '../src/IEntity';
+import {IEntity, LongId} from '../src/IEntity';
 import { entity } from '@google-cloud/datastore/build/src/entity';
 
 import * as DS from '@google-cloud/datastore/build/src/index';
@@ -8,9 +8,9 @@ import { Key } from '../src/Key';
 
 const ds = new DS.Datastore();
 
-class FakeEntity implements IEntity<Long> {
+class FakeEntity implements IEntity<LongId> {
 
-    id: Long;
+    id: LongId;
 
     public p1: string;
     public p2: number;
@@ -69,7 +69,7 @@ test("find by auto id", async () => {
 test("find by id", async () => {
     clearDb();
     var e = new FakeEntity();
-    e.id = new Long('123');
+    e.id = new LongId('123');
     await Tsify.save(e);
 
     e = await Tsify.findByKey(Key.fromEntity(e));
